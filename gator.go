@@ -2,9 +2,11 @@ package main
 
 import (
 	"github.com/SoFarCalm/blobgator/internal/config"
+	"github.com/SoFarCalm/blobgator/internal/database"
 )
 
 type state struct {
+	db        *database.Queries
 	configPtr *config.Config
 }
 
