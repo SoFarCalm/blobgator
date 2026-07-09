@@ -1,45 +1,46 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"os"
-	"time"
 
 	"github.com/SoFarCalm/blobgator/internal/config"
 	"github.com/SoFarCalm/blobgator/internal/database"
-	"github.com/SoFarCalm/blobgator/internal/rssfeed"
 	_ "github.com/lib/pq"
 )
 
+type state struct {
+	db  *database.Queries
+	cfg *config.Config
+}
+
 func main() {
-	cfg, err := config.ReadConfig()
+	cfg, err := config.Read()
 	if err != nil {
-		log.Fatalf("Error reading config %v", err)
+		log.Fatalf("error reading config: %v", err)
 	}
 
-	db, err := sql.Open("postgres", cfg.DbURL)
+	db, err := sql.Open("postgres", cfg.DBURL)
 	if err != nil {
-		log.Fatalf("Error connecting to database: %v", err)
+		log.Fatalf("error connecting to db: %v", err)
 	}
-
 	defer db.Close()
-
 	dbQueries := database.New(db)
 
 	programState := &state{
-		db:        dbQueries,
-		configPtr: &cfg,
+		db:  dbQueries,
+		cfg: &cfg,
 	}
 
 	cmds := commands{
-		commandMap: make(map[string]func(*state, command) error),
+		registeredCommands: make(map[string]func(*state, command) error),
 	}
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handlerRegister)
 	cmds.register("reset", handlerReset)
-	cmds.register("users", handlerGetUsers)
+	cmds.register("users", handlerListUsers)
+	cmds.register("agg", handlerAgg)
 
 	if len(os.Args) < 2 {
 		log.Fatal("Usage: cli <command> [args...]")
@@ -47,12 +48,9 @@ func main() {
 
 	cmdName := os.Args[1]
 	cmdArgs := os.Args[2:]
-	cmds.run(programState, command{name: cmdName, args: cmdArgs})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	client := rssfeed.Client{}
-	client.FetchFeed(ctx, rssfeed.BaseURL)
-	os.Exit(0)
+	err = cmds.run(programState, command{Name: cmdName, Args: cmdArgs})
+	if err != nil {
+		log.Fatal(err)
+	}
 }

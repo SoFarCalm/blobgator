@@ -3,108 +3,75 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
 	"time"
 
 	"github.com/SoFarCalm/blobgator/internal/database"
 	"github.com/google/uuid"
 )
 
-func handlerLogin(s *state, cmd command) error {
-	if len(cmd.args) != 1 {
-		fmt.Println("Please provide a username")
-		os.Exit(1)
-	}
-
-	name := cmd.args[0]
-
-	returnedUser, err := s.db.GetUser(context.Background(), name)
-	if err != nil {
-		log.Fatalf("user %s does not exist", name)
-		os.Exit(1)
-	}
-
-	if len(returnedUser) == 0 {
-		fmt.Printf("User %s dosen't exists\n", name)
-		os.Exit(1)
-	}
-
-	err = s.configPtr.SetUser(name)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("User has been set")
-
-	return nil
-}
-
 func handlerRegister(s *state, cmd command) error {
-	if len(cmd.args) != 1 {
-		fmt.Println("Please provide a username")
-		os.Exit(1)
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("usage: %v <name>", cmd.Name)
 	}
 
-	name := cmd.args[0]
+	name := cmd.Args[0]
 
-	returnedUser, _ := s.db.GetUser(context.Background(), name)
-
-	if returnedUser == name {
-		fmt.Printf("User %s already exists\n", name)
-		os.Exit(1)
-	}
-
-	c := database.CreateUserParams{
+	user, err := s.db.CreateUser(context.Background(), database.CreateUserParams{
 		ID:        uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 		Name:      name,
-	}
-
-	createdUser, err := s.db.CreateUser(context.Background(), c)
+	})
 	if err != nil {
-		log.Fatalf("Error when creating user %v\n", err)
+		return fmt.Errorf("couldn't create user: %w", err)
 	}
 
-	err = s.configPtr.SetUser(name)
+	err = s.cfg.SetUser(user.Name)
 	if err != nil {
-		log.Fatalf("Error when setting user %v\n", err)
+		return fmt.Errorf("couldn't set current user: %w", err)
 	}
 
-	fmt.Println("User has been created as follows")
-	fmt.Printf("- %s\n", createdUser.ID)
-	fmt.Printf("- %s\n", createdUser.CreatedAt)
-	fmt.Printf("- %s\n", createdUser.UpdatedAt)
-	fmt.Printf("- %s\n", createdUser.Name)
-
+	fmt.Println("User created successfully:")
+	printUser(user)
 	return nil
 }
 
-func handlerReset(s *state, cmd command) error {
-	err := s.db.DeleteUsers(context.Background())
+func handlerLogin(s *state, cmd command) error {
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("usage: %s <name>", cmd.Name)
+	}
+	name := cmd.Args[0]
+
+	_, err := s.db.GetUser(context.Background(), name)
 	if err != nil {
-		log.Fatalf("Error when deleting from users table: %v\n", err)
+		return fmt.Errorf("couldn't find user: %w", err)
 	}
 
-	fmt.Println("All users have been deleted")
+	err = s.cfg.SetUser(name)
+	if err != nil {
+		return fmt.Errorf("couldn't set current user: %w", err)
+	}
+
+	fmt.Println("User switched successfully!")
 	return nil
 }
 
-func handlerGetUsers(s *state, cmd command) error {
-
+func handlerListUsers(s *state, cmd command) error {
 	users, err := s.db.GetUsers(context.Background())
 	if err != nil {
-		log.Fatalf("Error when fecthing uesrs %v\n", err)
+		return fmt.Errorf("couldn't list users: %w", err)
 	}
-
-	for i := 0; i < len(users); i++ {
-		if users[i].Name == s.configPtr.CurrentUsername {
-			fmt.Printf("- %s (current)\n", users[i].Name)
-		} else {
-			fmt.Printf("- %s\n", users[i].Name)
+	for _, user := range users {
+		if user.Name == s.cfg.CurrentUserName {
+			fmt.Printf("* %v (current)\n", user.Name)
+			continue
 		}
+		fmt.Printf("* %v\n", user.Name)
 	}
-
 	return nil
+}
+
+func printUser(user database.User) {
+	fmt.Printf(" * ID:      %v\n", user.ID)
+	fmt.Printf(" * Name:    %v\n", user.Name)
 }
