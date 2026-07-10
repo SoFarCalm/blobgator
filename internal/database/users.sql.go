@@ -58,14 +58,30 @@ func (q *Queries) DeleteUsers(ctx context.Context) error {
 }
 
 const getUser = `-- name: GetUser :one
-SELECT name FROM users WHERE name = $1
+SELECT id, name FROM users WHERE name = $1
 `
 
-func (q *Queries) GetUser(ctx context.Context, name string) (string, error) {
+type GetUserRow struct {
+	ID   uuid.UUID
+	Name string
+}
+
+func (q *Queries) GetUser(ctx context.Context, name string) (GetUserRow, error) {
 	row := q.db.QueryRowContext(ctx, getUser, name)
-	var name_2 string
-	err := row.Scan(&name_2)
-	return name_2, err
+	var i GetUserRow
+	err := row.Scan(&i.ID, &i.Name)
+	return i, err
+}
+
+const getUserName = `-- name: GetUserName :one
+SELECT name FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserName(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, getUserName, id)
+	var name string
+	err := row.Scan(&name)
+	return name, err
 }
 
 const getUsers = `-- name: GetUsers :many
