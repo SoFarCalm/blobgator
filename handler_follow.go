@@ -9,18 +9,48 @@ import (
 	"github.com/google/uuid"
 )
 
-func handlerFollow(s *state, cmd command) error {
+func handlerUnfollow(s *state, cmd command, user database.GetUserRow) error {
+	if len(cmd.Args) < 1 {
+		return fmt.Errorf("Please provide a feed url")
+	}
+
+	feed, err := s.db.GetFeedName(context.Background(), cmd.Args[0])
+	if err != nil {
+		return err
+	}
+
+	s.db.DeleteFeedFollows(context.Background(), database.DeleteFeedFollowsParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("User %s has unfollowed %s \n", user.Name, feed.Name)
+	return nil
+}
+
+func handlerFollowing(s *state, cmd command, user database.GetUserRow) error {
+
+	following, err := s.db.GetFeedFollowsForUser(context.Background(), user.Name)
+	if err != nil {
+		fmt.Errorf("Error fetching follows: %w", err)
+	}
+
+	for _, follow := range following {
+		fmt.Printf("- %s\n", follow.FeedName)
+	}
+
+	return nil
+}
+
+func handlerFollow(s *state, cmd command, user database.GetUserRow) error {
 	if len(cmd.Args) < 1 {
 		return fmt.Errorf("Please enter a URL")
 	}
 
 	url := cmd.Args[0]
-	currentUser := s.cfg.CurrentUserName
-
-	user, err := s.db.GetUser(context.Background(), currentUser)
-	if err != nil {
-		fmt.Errorf("Error fecthing user name: %w", err)
-	}
 
 	feed, err := s.db.GetFeedName(context.Background(), url)
 	if err != nil {
@@ -41,6 +71,6 @@ func handlerFollow(s *state, cmd command) error {
 }
 
 func printFeedFollow(feed_follow database.CreateFeedFollowRow) {
-	fmt.Printf(" * Feed:      %v\n", feed_follow.FeedName)
+	fmt.Printf(" * Feed:    %v\n", feed_follow.FeedName)
 	fmt.Printf(" * User:    %v\n", feed_follow.UserName)
 }

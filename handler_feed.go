@@ -27,19 +27,13 @@ func handlerListFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.GetUserRow) error {
 	if len(cmd.Args) < 2 {
 		return fmt.Errorf("usage: %v <name>, example.com <url>", cmd.Name)
 	}
 
 	name := cmd.Args[0]
 	url := cmd.Args[1]
-	currentUser := s.cfg.CurrentUserName
-
-	user, err := s.db.GetUser(context.Background(), currentUser)
-	if err != nil {
-		return fmt.Errorf("Error fecthing users")
-	}
 
 	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
 		ID:        uuid.New(),
@@ -48,6 +42,17 @@ func handlerAddFeed(s *state, cmd command) error {
 		Name:      name,
 		Url:       url,
 		UserID:    user.ID,
+	})
+	if err != nil {
+		return fmt.Errorf("Error creating feed: %w", err)
+	}
+
+	s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
 	})
 
 	printFeed(feed)
