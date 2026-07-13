@@ -29,7 +29,7 @@ func handlerListFeeds(s *state, cmd command) error {
 
 func handlerAddFeed(s *state, cmd command, user database.GetUserRow) error {
 	if len(cmd.Args) < 2 {
-		return fmt.Errorf("usage: %v <name>, example.com <url>", cmd.Name)
+		return fmt.Errorf("Please provide 2 arguments, usage: %v <name>, example.com <url>", cmd.Name)
 	}
 
 	name := cmd.Args[0]
@@ -55,6 +55,7 @@ func handlerAddFeed(s *state, cmd command, user database.GetUserRow) error {
 		FeedID:    feed.ID,
 	})
 
+	fmt.Println("Feed added successfully!")
 	printFeed(feed)
 
 	return nil
