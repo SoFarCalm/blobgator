@@ -1,6 +1,6 @@
 # Blobgator
 
-Blobgator is a Go-based command-line application for managing RSS and Atom feeds, following feeds, and browsing posts stored in a PostgreSQL database. It acts like a lightweight feed reader and ingestion tool, combining user management, feed discovery, and periodic feed scraping in one CLI.
+Blobgator gator is a Go-based command-line application for managing RSS and Atom feeds, following feeds, and browsing posts stored in a PostgreSQL database. It acts like a lightweight feed reader and ingestion tool, combining user management, feed discovery, and periodic feed scraping in one CLI.
 
 ## What the project does
 
