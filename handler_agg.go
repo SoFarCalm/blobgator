@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/SoFarCalm/blobgator/internal/database"
@@ -59,18 +60,24 @@ func scrapeFeeds(s *state) error {
 
 	for _, post := range fetchedFeed.Channel.Item {
 		fmt.Println("entering for loop here")
-		parsedPubTime, err := time.Parse(time.RFC3339, post.PubDate)
-		fmt.Println(parsedPubTime)
+		//parsedPubTime, err := time.Parse(time.RFC3339, post.PubDate)
+		pubDate, err := parseFeedDate(post.PubDate)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(pubDate)
 		if err != nil {
 			return err
 		}
 		fmt.Println("Creating post...")
+		now := time.Now().UTC()
 		postCreated, err := s.db.CreatePost(context.Background(), database.CreatePostParams{
 			ID:        uuid.New(),
-			CreatedAt: time.Now().UTC(),
+			CreatedAt: now,
 			UpdatedAt: sql.NullTime{
-				Time:  time.Now().UTC(),
-				Valid: !time.Now().UTC().IsZero(),
+				Time:  now,
+				Valid: true,
 			},
 			Title: sql.NullString{
 				String: post.Title,
@@ -82,11 +89,11 @@ func scrapeFeeds(s *state) error {
 			},
 			Description: sql.NullString{
 				String: post.Description,
-				Valid:  post.Description != "",
+				Valid:  post.Link != "",
 			},
 			PublishedAt: sql.NullTime{
-				Time:  parsedPubTime,
-				Valid: !parsedPubTime.IsZero(),
+				Time:  pubDate,
+				Valid: !pubDate.IsZero(),
 			},
 			FeedID: feed.ID,
 		})
@@ -101,4 +108,26 @@ func scrapeFeeds(s *state) error {
 	// }
 
 	return nil
+}
+
+func parseFeedDate(dateStr string) (time.Time, error) {
+	// Clean whitespace around the incoming string
+	dateStr = strings.TrimSpace(dateStr)
+
+	// List of common formats used across various RSS, Atom, and custom JSON feeds
+	formats := []string{
+		time.RFC3339,          // Atom / JSON Feeds (e.g. 2026-07-13T21:22:00Z)
+		time.RFC1123Z,         // RSS 2.0 with numeric zones (e.g. Mon, 13 Jul 2026 21:22:00 +0000)
+		time.RFC1123,          // RSS 2.0 with named zones (e.g. Mon, 13 Jul 2026 21:22:00 GMT)
+		"2006-01-02 15:04:05", // Legacy Postgres style fallback timestamps
+	}
+
+	for _, format := range formats {
+		if parsedTime, err := time.Parse(format, dateStr); err == nil {
+			// Convert to UTC explicitly so it stores correctly in your PostgreSQL database
+			return parsedTime.UTC(), nil
+		}
+	}
+
+	return time.Time{}, fmt.Errorf("unable to parse date string: %s", dateStr)
 }
